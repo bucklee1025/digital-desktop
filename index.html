@@ -115,6 +115,25 @@
       border-color: var(--primary);
     }
 
+    /* 数据导出/导入（跨设备同步） */
+    .sync-group { display: flex; gap: 8px; align-items: center; }
+    .sync-btn {
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-hover);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: transform var(--transition), border-color var(--transition), color var(--transition);
+    }
+    .sync-btn:hover {
+      transform: translateY(-2px);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
     /* 主体三栏 */
     .dashboard {
       display: grid;
@@ -976,6 +995,11 @@
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
           </svg>
         </button>
+        <div class="sync-group">
+          <button class="sync-btn" id="export-btn" title="导出全部数据为备份文件（用于换设备恢复）">导出</button>
+          <button class="sync-btn" id="import-btn" title="从备份文件恢复数据">导入</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden />
+        </div>
       </div>
     </header>
 
@@ -5243,6 +5267,54 @@
       // 键盘快捷键
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') modal.classList.remove('open');
+      });
+
+      // ===== 数据导出 / 导入（跨设备同步）=====
+      const exportBtn = document.getElementById('export-btn');
+      const importBtn = document.getElementById('import-btn');
+      const importFile = document.getElementById('import-file');
+
+      function exportData() {
+        const data = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          data[k] = localStorage.getItem(k);
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+        a.href = url;
+        a.download = 'digital-desktop-backup-' + ts + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function importData(file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(reader.result);
+            if (!confirm('导入将用备份文件覆盖当前设备的全部数据，确定继续？')) return;
+            localStorage.clear();
+            for (const k in data) {
+              if (Object.prototype.hasOwnProperty.call(data, k)) localStorage.setItem(k, data[k]);
+            }
+            location.reload();
+          } catch (err) {
+            alert('导入失败：文件不是有效的备份 JSON。');
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      if (exportBtn) exportBtn.addEventListener('click', exportData);
+      if (importBtn) importBtn.addEventListener('click', () => { if (importFile) importFile.click(); });
+      if (importFile) importFile.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) importData(e.target.files[0]);
+        e.target.value = '';
       });
     })();
   </script>
